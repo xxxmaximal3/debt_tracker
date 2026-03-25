@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Учёт долгов</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Onest:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg:         #0d0d0f;
+  --surface:    #18181c;
+  --surface2:   #22222a;
+  --border:     rgba(255,255,255,0.07);
+  --accent:     #c8ff57;
+  --accent-dim: rgba(200,255,87,0.12);
+  --red:        #ff5757;
+  --red-dim:    rgba(255,87,87,0.12);
+  --green:      #57ffb8;
+  --green-dim:  rgba(87,255,184,0.10);
+  --text:       #f0f0f5;
+  --muted:      #6e6e82;
+  --r:          14px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--text); font-family: 'Onest', sans-serif; font-size: 14px; min-height: 100vh; overflow-x: hidden; }
+
+/* ── HEADER ── */
+.header {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--bg);
+  padding: 14px 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.month-nav {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-bottom: 12px;
+}
+
+.month-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--muted); width: 32px; height: 32px; border-radius: 8px;
+  font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.month-btn:active { background: var(--surface2); color: var(--text); transform: scale(.9); }
+
+.month-label {
+  font-family: 'Unbounded', sans-serif; font-size: 16px; font-weight: 700;
+  letter-spacing: -.3px; color: var(--text); min-width: 175px; text-align: center;
+}
+
+.balance-bar {
+  display: flex; align-items: stretch;
+  background: var(--surface); border-radius: 12px 12px 0 0; overflow: hidden;
+}
+
+.bal-block {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 5px; padding: 10px 10px;
+}
+.bal-block + .bal-block { border-left: 1px solid var(--border); }
+
+.bal-label { font-size: 10px; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; font-weight: 600; }
+
+.bal-input {
+  width: 100%; background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--green);
+  font-family: 'Unbounded', sans-serif; font-size: 13px; font-weight: 600;
+  text-align: center; padding: 7px 4px; outline: none;
+  transition: border-color .15s, color .15s; -webkit-appearance: none;
+}
+.bal-input:focus { border-color: var(--accent); }
+.bal-input.neg   { color: var(--red); }
+
+.bal-arrow-wrap {
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px; color: var(--muted); font-size: 20px; flex-shrink: 0;
+}
+
+/* ── CONTENT ── */
+.content { padding: 10px 16px 100px; }
+
+.section-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--muted); margin: 14px 0 8px;
+}
+
+/* ── TABLE ── */
+.table-wrap { border-radius: var(--r); overflow: hidden; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+
+thead th {
+  background: var(--surface2); padding: 9px 10px;
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  letter-spacing: .5px; text-transform: uppercase; text-align: left;
+  cursor: pointer; user-select: none; white-space: nowrap;
+  transition: color .12s;
+}
+thead th:hover { color: var(--text); }
+thead th.r { text-align: right; }
+thead th .sort-arrow { margin-left: 4px; opacity: 0.35; font-style: normal; }
+thead th.sort-active { color: var(--accent); }
+thead th.sort-active .sort-arrow { opacity: 1; }
+
+tbody tr { border-top: 1px solid var(--border); background: var(--surface); transition: background .12s; }
+tbody tr:first-child { border-top: none; }
+
+td { padding: 11px 10px; font-size: 13px; vertical-align: middle; }
+td.r { text-align: right; }
+
+.td-name { font-weight: 500; }
+.td-amt  { font-family: 'Unbounded', sans-serif; font-size: 12px; }
+
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: 10px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase;
+}
+.badge.owe    { background: var(--red-dim);   color: var(--red);   }
+.badge.credit { background: var(--green-dim); color: var(--green); }
+
+.td-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.icon-btn {
+  width: 28px; height: 28px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+  transition: all .12s;
+}
+.icon-btn:active { transform: scale(.86); }
+.icon-btn.del:active  { color: var(--red);    border-color: var(--red);    background: var(--red-dim);    }
+.icon-btn.edit:active { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+
+.empty { text-align: center; padding: 44px 20px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.empty-icon { font-size: 38px; margin-bottom: 10px; }
+
+.summary {
+  margin-top: 14px; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.sum-item { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.sum-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.sum-val   { font-family: 'Unbounded', sans-serif; font-size: 14px; font-weight: 600; }
+.pos { color: var(--green); }
+.neg { color: var(--red);   }
+
+/* ── FAB ── */
+.fab {
+  position: fixed; bottom: 24px; right: 20px; z-index: 20;
+  background: var(--accent); color: #000; border: none;
+  border-radius: 50px; padding: 14px 22px;
+  font-family: 'Unbounded', sans-serif; font-size: 13px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 8px 28px rgba(200,255,87,.28);
+  transition: all .15s; letter-spacing: -.3px;
+}
+.fab:active { transform: scale(.94); }
+
+/* ── OVERLAY / SHEET ── */
+.overlay {
+  position: fixed; inset: 0; z-index: 30;
+  background: rgba(0,0,0,.65); backdrop-filter: blur(6px);
+  display: flex; align-items: flex-end;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.overlay.open { opacity: 1; pointer-events: all; }
+
+.sheet {
+  width: 100%; background: var(--surface);
+  border-radius: 20px 20px 0 0; padding: 20px 20px 44px;
+  transform: translateY(100%);
+  transition: transform .26s cubic-bezier(.32,.72,0,1);
+}
+.overlay.open .sheet { transform: translateY(0); }
+
+.sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+.sheet-title  { font-family: 'Unbounded', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+
+.field { margin-bottom: 14px; }
+.field label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--muted); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 7px;
+}
+.field input {
+  width: 100%; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-family: 'Onest', sans-serif; font-size: 15px;
+  padding: 12px 14px; outline: none; -webkit-appearance: none; transition: border-color .15s;
+}
+.field input:focus { border-color: var(--accent); }
+
+/* Who chips */
+.who-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.who-chip {
+  padding: 7px 14px; border-radius: 50px;
+  border: 1.5px solid var(--border); background: var(--surface2);
+  color: var(--muted); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s; white-space: nowrap; user-select: none;
+}
+.who-chip:active { transform: scale(.93); }
+.who-chip.selected { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.who-chip.add-chip { border-style: dashed; font-size: 12px; }
+
+.new-person-row { display: none; gap: 8px; margin-top: 8px; flex-direction: column; }
+.new-person-row.visible { display: flex; }
+.new-person-input-row { display: flex; gap: 8px; }
+.new-person-row input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-family: 'Onest', sans-serif;
+  font-size: 14px; padding: 9px 12px; outline: none; transition: border-color .15s;
+}
+.new-person-row input:focus { border-color: var(--accent); }
+.new-person-row button {
+  background: var(--accent-dim); border: 1px solid var(--accent);
+  color: var(--accent); border-radius: 10px; padding: 9px 14px;
+  font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.color-swatches { display: flex; gap: 7px; flex-wrap: wrap; padding: 2px 0; }
+.color-swatch {
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  border: 2.5px solid transparent; transition: all .15s; flex-shrink: 0;
+}
+.color-swatch.selected { border-color: #fff; transform: scale(1.18); }
+
+/* Type toggle */
+.type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.type-opt {
+  border: 1.5px solid var(--border); border-radius: 10px; padding: 12px;
+  text-align: center; cursor: pointer; font-weight: 600; font-size: 13px;
+  transition: all .15s; color: var(--muted); background: var(--surface2); user-select: none;
+}
+.type-opt:active { transform: scale(.96); }
+.type-opt.active.owe    { border-color: var(--red);   color: var(--red);   background: var(--red-dim);   }
+.type-opt.active.credit { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+
+.sheet-btn {
+  width: 100%; background: var(--accent); color: #000; border: none;
+  border-radius: 12px; padding: 15px;
+  font-family: 'Unbounded', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; margin-top: 8px; transition: all .15s; letter-spacing: -.3px;
+}
+.sheet-btn:active { transform: scale(.97); }
+
+/* ── DEBTOR SUMMARY ── */
+.debtor-summary {
+  margin-bottom: 10px; border-radius: var(--r);
+  border: 1px solid var(--border); overflow: hidden;
+}
+.debtor-summary-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--muted);
+  padding: 9px 12px; background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.debtor-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.debtor-row:first-of-type { border-top: none; }
+.debtor-name { font-weight: 500; font-size: 13px; }
+.debtor-amounts { display: flex; gap: 10px; align-items: center; }
+.debtor-amt {
+  font-family: 'Unbounded', sans-serif; font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 6px;
+}
+.debtor-amt.pos { color: var(--green); background: var(--green-dim); }
+.debtor-amt.neg { color: var(--red);   background: var(--red-dim);   }
+.debtor-amt.net { color: var(--accent); background: var(--accent-dim); }
+
+.td-date { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(13,13,15,0.7); backdrop-filter: blur(4px);
+  display: none; align-items: center; justify-content: center;
+}
+.spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: var(--accent);
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast {
+  position: fixed; bottom: 90px; left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 10px 20px; border-radius: 50px;
+  font-size: 13px; font-weight: 500; z-index: 50;
+  opacity: 0; transition: all .22s; white-space: nowrap; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="month-nav">
+    <button class="month-btn" onclick="changeMonth(-1)">‹</button>
+    <div class="month-label" id="monthLabel"></div>
+    <button class="month-btn" onclick="changeMonth(1)">›</button>
+  </div>
+
+  <div class="balance-bar">
+    <div class="bal-block">
+      <div class="bal-label">Начало</div>
+      <input class="bal-input" id="balStart" type="text" inputmode="numeric" placeholder="0"
+             oninput="onBalInput('start')" onblur="onBalBlur('start')" onfocus="onBalFocus('start')">
+    </div>
+    <div class="bal-arrow-wrap">→</div>
+    <div class="bal-block">
+      <div class="bal-label">Конец</div>
+      <input class="bal-input" id="balEnd" type="text" inputmode="numeric" placeholder="0"
+             oninput="onBalInput('end')" onblur="onBalBlur('end')" onfocus="onBalFocus('end')">
+    </div>
+  </div>
+</div>
+
+<div class="content">
+  <div id="debtorSummaryWrap"></div>
+
+  <div class="section-title">Записи</div>
+
+  <div class="table-wrap" id="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('person')">Кто должен<i class="sort-arrow" id="arr-person">↕</i></th>
+          <th class="r" onclick="sortBy('date')">Дата<i class="sort-arrow" id="arr-date">↕</i></th>
+          <th class="r" onclick="sortBy('amount')">Сумма<i class="sort-arrow" id="arr-amount">↕</i></th>
+          <th class="r" onclick="sortBy('type')">Тип<i class="sort-arrow" id="arr-type">↕</i></th>
+          <th class="r"></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div id="emptyState" class="empty">
+    <div class="empty-icon">🗂</div>
+    <div>Нет записей за этот месяц.<br>Нажми <b>＋ Добавить</b>, чтобы начать.</div>
+  </div>
+
+  <div class="summary" id="summary" style="display:none">
+    <div class="sum-item">
+      <div class="sum-label">Мне должны</div>
+      <div class="sum-val pos" id="sumCredit">0 ₽</div>
+    </div>
+    <div class="sum-item">
+      <div class="sum-label">Я должен</div>
+      <div class="sum-val neg" id="sumOwe">0 ₽</div>
+    </div>
+    <div class="sum-item">
+      <div class="sum-label">Итог</div>
+      <div class="sum-val" id="sumNet">0 ₽</div>
+    </div>
+  </div>
+</div>
+
+<button class="fab" onclick="openSheet()">＋ Добавить</button>
+
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="sheetTitle">Новая запись</div>
+
+    <div class="field">
+      <label>Кто должен</label>
+      <div class="who-row" id="whoRow"></div>
+      <div class="new-person-row" id="newPersonRow">
+        <div class="new-person-input-row">
+          <input type="text" id="newPersonInput" placeholder="Введите имя..." maxlength="25">
+          <button onclick="confirmNewPerson()">ОК</button>
+        </div>
+        <div class="color-swatches" id="colorSwatches"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Сумма (₽)</label>
+      <input type="number" id="fAmount" placeholder="0" min="0" step="any">
+    </div>
+
+    <div class="field">
+      <label>Дата</label>
+      <input type="text" id="fDate" placeholder="01.01.2026" maxlength="10">
+    </div>
+
+    <div class="field">
+      <label>Направление</label>
+      <div class="type-toggle">
+        <div class="type-opt owe active" id="typeOwe"    onclick="selectType('owe')">Я должен</div>
+        <div class="type-opt credit"     id="typeCredit" onclick="selectType('credit')">Мне должны</div>
+      </div>
+    </div>
+
+    <button class="sheet-btn" onclick="saveEntry()">Сохранить</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://zvfpigtuvwlernoftzve.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_HlOEN-0GN0GMp4Ep0WSP8Q_-LTuy2o5';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// user_id: Telegram user id или случайный из localStorage
+const USER_ID = (() => {
+  const tg = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+  if (tg) return String(tg);
+  let id = localStorage.getItem('debt_uid');
+  if (!id) { id = 'u_' + Math.random().toString(36).slice(2,10); localStorage.setItem('debt_uid', id); }
+  return id;
+})();
+
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+let currentDate    = new Date();
+let currentType    = 'owe';
+let selectedPerson = null;
+let editingId      = null;
+
+// ── In-memory cache ──────────────────────────────
+let _entries  = [];   // записи текущего месяца
+let _people   = [];   // [{name, color_idx}]
+let _bals     = {};   // {start, end}
+
+const PERSON_COLORS = [
+  { bg: 'rgba(120,100,255,0.10)', border: 'rgba(120,100,255,0.35)', text: '#a78bfa', swatch: '#a78bfa' },
+  { bg: 'rgba(255,160,50,0.10)',  border: 'rgba(255,160,50,0.35)',  text: '#ffa032', swatch: '#ffa032' },
+  { bg: 'rgba(50,200,255,0.10)',  border: 'rgba(50,200,255,0.35)',  text: '#32c8ff', swatch: '#32c8ff' },
+  { bg: 'rgba(255,80,160,0.10)',  border: 'rgba(255,80,160,0.35)',  text: '#ff50a0', swatch: '#ff50a0' },
+  { bg: 'rgba(80,220,120,0.10)',  border: 'rgba(80,220,120,0.35)',  text: '#50dc78', swatch: '#50dc78' },
+  { bg: 'rgba(255,220,50,0.10)',  border: 'rgba(255,220,50,0.35)',  text: '#ffdc32', swatch: '#ffdc32' },
+  { bg: 'rgba(255,100,80,0.10)',  border: 'rgba(255,100,80,0.35)',  text: '#ff6450', swatch: '#ff6450' },
+  { bg: 'rgba(0,210,200,0.10)',   border: 'rgba(0,210,200,0.35)',   text: '#00d2c8', swatch: '#00d2c8' },
+  { bg: 'rgba(200,255,87,0.10)',  border: 'rgba(200,255,87,0.35)',  text: '#c8ff57', swatch: '#c8ff57' },
+  { bg: 'rgba(180,120,255,0.10)', border: 'rgba(180,120,255,0.35)', text: '#b478ff', swatch: '#b478ff' },
+  { bg: 'rgba(255,200,100,0.10)', border: 'rgba(255,200,100,0.35)', text: '#ffc864', swatch: '#ffc864' },
+  { bg: 'rgba(100,180,255,0.10)', border: 'rgba(100,180,255,0.35)', text: '#64b4ff', swatch: '#64b4ff' },
+];
+
+let selectedColorIdx = 0;
+
+function getPersonColor(name) {
+  const p = _people.find(x => x.name === name);
+  const idx = p ? p.color_idx : _people.findIndex(x => x.name === name);
+  return PERSON_COLORS[(idx >= 0 ? idx : 0) % PERSON_COLORS.length];
+}
+
+function renderColorSwatches() {
+  const wrap = document.getElementById('colorSwatches');
+  wrap.innerHTML = '';
+  PERSON_COLORS.forEach((c, i) => {
+    const s = document.createElement('div');
+    s.className = 'color-swatch' + (i === selectedColorIdx ? ' selected' : '');
+    s.style.background = c.swatch;
+    s.onclick = () => { selectedColorIdx = i; renderColorSwatches(); };
+    wrap.appendChild(s);
+  });
+}
+
+// parse dd.mm.yyyy → sortable number
+function parseDateSort(s) {
+  if (!s) return 0;
+  const p = s.split('.');
+  if (p.length !== 3) return 0;
+  return parseInt(p[2] + p[1].padStart(2,'0') + p[0].padStart(2,'0'), 10) || 0;
+}
+
+const monthKey = d => `${d.getFullYear()}-${d.getMonth()}`;
+const fmt      = n => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(Math.abs(n)) + ' ₽';
+const fmtS     = n => (n >= 0 ? '+' : '−') + fmt(n);
+const esc      = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const genId    = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+
+// ── Loading state ────────────────────────────────
+function setLoading(on) {
+  document.getElementById('loadingOverlay').style.display = on ? 'flex' : 'none';
+}
+
+// ── Supabase data loaders ────────────────────────
+async function loadMonth() {
+  setLoading(true);
+  const k = monthKey(currentDate);
+  const [{ data: entries }, { data: bals }, { data: people }] = await Promise.all([
+    sb.from('debt_data').select('*').eq('user_id', USER_ID).eq('month_key', k),
+    sb.from('debt_balances').select('*').eq('user_id', USER_ID).eq('month_key', k),
+    sb.from('debt_people').select('*').eq('user_id', USER_ID).order('name'),
+  ]);
+  _entries = entries || [];
+  _people  = people  || [];
+  _bals    = {};
+  (bals || []).forEach(b => { _bals[b.which] = b.value; });
+  setLoading(false);
+  render();
+}
+
+// ── Balances ─────────────────────────────────────
+const fmtBal  = n => new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 0}).format(Math.abs(n));
+const parseBal = s => parseFloat(String(s).replace(/\s/g, '').replace(',', '.'));
+
+function onBalInput(which) {
+  const el  = document.getElementById(which === 'start' ? 'balStart' : 'balEnd');
+  const raw = el.value.replace(/\s/g, '');
+  const isNeg = raw.startsWith('-');
+  const digits = raw.replace(/\D/g, '');
+  const num = parseInt(digits, 10);
+  const pos = el.selectionStart;
+  const prevLen = el.value.length;
+  if (digits === '') { el.value = isNeg ? '-' : ''; }
+  else { el.value = (isNeg ? '-' : '') + fmtBal(num); }
+  const diff = el.value.length - prevLen;
+  el.setSelectionRange(pos + diff, pos + diff);
+  el.classList.toggle('neg', isNeg && digits !== '');
+}
+
+function onBalFocus(which) {
+  const el = document.getElementById(which === 'start' ? 'balStart' : 'balEnd');
+  el.value = String(el.value).replace(/\s/g, '');
+  el.select();
+}
+
+async function onBalBlur(which) {
+  const el  = document.getElementById(which === 'start' ? 'balStart' : 'balEnd');
+  const val = parseBal(el.value);
+  if (isNaN(val)) { el.value = ''; delete _bals[which]; }
+  else { _bals[which] = val; el.value = (val < 0 ? '-' : '') + fmtBal(val); }
+  el.classList.toggle('neg', !isNaN(val) && val < 0);
+  const k = monthKey(currentDate);
+  if (isNaN(val)) {
+    await sb.from('debt_balances').delete().eq('user_id', USER_ID).eq('month_key', k).eq('which', which);
+  } else {
+    await sb.from('debt_balances').upsert({ user_id: USER_ID, month_key: k, which, value: val }, { onConflict: 'user_id,month_key,which' });
+  }
+}
+
+function loadBals() {
+  const sEl = document.getElementById('balStart');
+  const eEl = document.getElementById('balEnd');
+  sEl.value = _bals.start != null ? (_bals.start < 0 ? '-' : '') + fmtBal(_bals.start) : '';
+  eEl.value = _bals.end   != null ? (_bals.end   < 0 ? '-' : '') + fmtBal(_bals.end)   : '';
+  sEl.classList.toggle('neg', (_bals.start ?? 0) < 0);
+  eEl.classList.toggle('neg', (_bals.end   ?? 0) < 0);
+}
+
+// ── Sort ──────────────────────────────────────────
+let sortCol = 'date';
+let sortAsc = false;
+
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = col === 'person' || col === 'type'; }
+  updateSortHeaders();
+  render();
+}
+
+function updateSortHeaders() {
+  ['person','date','amount','type'].forEach(col => {
+    const th  = document.getElementById('arr-' + col)?.parentElement;
+    const arr = document.getElementById('arr-' + col);
+    if (!th || !arr) return;
+    th.classList.toggle('sort-active', sortCol === col);
+    arr.textContent = sortCol === col ? (sortAsc ? '↑' : '↓') : '↕';
+  });
+}
+
+function changeMonth(dir) {
+  currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + dir, 1);
+  loadMonth();
+}
+
+// ── Render ────────────────────────────────────────
+function render() {
+  document.getElementById('monthLabel').textContent =
+    MONTHS[currentDate.getMonth()] + ' ' + currentDate.getFullYear();
+
+  loadBals();
+
+  const has = _entries.length > 0;
+  document.getElementById('tableWrap').style.display  = has ? '' : 'none';
+  document.getElementById('emptyState').style.display = has ? 'none' : 'block';
+  document.getElementById('summary').style.display    = has ? '' : 'none';
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  if (!has) { updateSortHeaders(); return; }
+
+  const sorted = [..._entries].sort((a, b) => {
+    let va, vb;
+    if (sortCol === 'date')        { va = parseDateSort(a.date);        vb = parseDateSort(b.date); }
+    else if (sortCol === 'amount') { va = +a.amount;                    vb = +b.amount; }
+    else if (sortCol === 'person') { va = a.person.toLowerCase();       vb = b.person.toLowerCase(); }
+    else if (sortCol === 'type')   { va = a.type;                       vb = b.type; }
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+
+  updateSortHeaders();
+
+  sorted.forEach(e => {
+    const c  = getPersonColor(e.person);
+    const tr = document.createElement('tr');
+    tr.style.cssText = `background:${c.bg}; border-left:3px solid ${c.border};`;
+    tr.innerHTML = `
+      <td><div class="td-name" style="color:${c.text}">${esc(e.person)}</div></td>
+      <td class="r td-date">${esc(e.date || '—')}</td>
+      <td class="r td-amt ${e.type==='owe'?'neg':'pos'}">${fmt(e.amount)}</td>
+      <td class="r"><span class="badge ${e.type}">${e.type==='owe'?'Должен':'Мне'}</span></td>
+      <td class="r">
+        <div class="td-actions">
+          <button class="icon-btn edit" onclick="openEdit('${e.id}')">✎</button>
+          <button class="icon-btn del"  onclick="deleteEntry('${e.id}')">✕</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  let credit = 0, owe = 0;
+  _entries.forEach(e => e.type==='credit' ? credit+=+e.amount : owe+=+e.amount);
+  const net = credit - owe;
+  document.getElementById('sumCredit').textContent = '+' + fmt(credit);
+  document.getElementById('sumOwe').textContent    = '−' + fmt(owe);
+  const netEl = document.getElementById('sumNet');
+  netEl.textContent = fmtS(net);
+  netEl.className   = 'sum-val ' + (net >= 0 ? 'pos' : 'neg');
+
+  renderDebtorSummary(_entries);
+}
+
+// ── Debtor summary ────────────────────────────────
+function renderDebtorSummary(entries) {
+  const wrap = document.getElementById('debtorSummaryWrap');
+  if (!entries || entries.length === 0) { wrap.innerHTML = ''; return; }
+  const map = {};
+  entries.forEach(e => {
+    if (!map[e.person]) map[e.person] = { credit: 0, owe: 0 };
+    e.type === 'credit' ? map[e.person].credit += +e.amount : map[e.person].owe += +e.amount;
+  });
+  let html = '<div class="debtor-summary"><div class="debtor-summary-title">Итог по должникам</div>';
+  Object.entries(map).forEach(([name, v]) => {
+    const net = v.credit - v.owe;
+    const cls = net >= 0 ? 'pos' : 'neg';
+    const sign = net >= 0 ? '+' : '−';
+    const c = getPersonColor(name);
+    html += `<div class="debtor-row" style="border-left:3px solid ${c.border}"><span class="debtor-name" style="color:${c.text}">${esc(name)}</span><div class="debtor-amounts"><span class="debtor-amt ${cls}">${sign}${fmt(net)}</span></div></div>`;
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+// ── People chips ──────────────────────────────────
+function renderWhoChips(active) {
+  const row = document.getElementById('whoRow');
+  row.innerHTML = '';
+
+  _people.forEach(p => {
+    const c    = getPersonColor(p.name);
+    const chip = document.createElement('div');
+    chip.className = 'who-chip' + (p.name === active ? ' selected' : '');
+    if (p.name === active) { chip.style.borderColor = c.border; chip.style.color = c.text; chip.style.background = c.bg; }
+    chip.style.display = 'flex'; chip.style.alignItems = 'center';
+
+    const label = document.createElement('span');
+    label.textContent = p.name;
+    label.style.cssText = 'flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;';
+    label.onclick = () => { selectedPerson = p.name; renderWhoChips(p.name); };
+
+    const del = document.createElement('span');
+    del.textContent = '✕';
+    del.style.cssText = 'margin-left:6px; font-size:10px; opacity:0.5; cursor:pointer; flex-shrink:0;';
+    del.onclick = ev => { ev.stopPropagation(); deletePerson(p.name); };
+
+    chip.appendChild(label); chip.appendChild(del);
+    row.appendChild(chip);
+  });
+
+  const addBtn = document.createElement('div');
+  addBtn.className   = 'who-chip add-chip';
+  addBtn.textContent = '＋ Новый';
+  addBtn.onclick = () => {
+    const r = document.getElementById('newPersonRow');
+    r.classList.toggle('visible');
+    if (r.classList.contains('visible')) {
+      selectedColorIdx = 0;
+      renderColorSwatches();
+      setTimeout(() => document.getElementById('newPersonInput').focus(), 80);
+    }
+  };
+  row.appendChild(addBtn);
+}
+
+async function confirmNewPerson() {
+  const inp = document.getElementById('newPersonInput');
+  const val = inp.value.trim();
+  if (!val) return;
+  if (!_people.find(p => p.name === val)) {
+    const { error } = await sb.from('debt_people').upsert({ user_id: USER_ID, name: val, color_idx: selectedColorIdx }, { onConflict: 'user_id,name' });
+    if (!error) _people.push({ name: val, color_idx: selectedColorIdx });
+  }
+  inp.value = '';
+  document.getElementById('newPersonRow').classList.remove('visible');
+  selectedPerson = val;
+  renderWhoChips(val);
+}
+
+async function deletePerson(name) {
+  await sb.from('debt_people').delete().eq('user_id', USER_ID).eq('name', name);
+  _people = _people.filter(p => p.name !== name);
+  if (selectedPerson === name) selectedPerson = null;
+  renderWhoChips(selectedPerson);
+  showToast('Удалено: ' + name);
+}
+
+// ── CRUD ──────────────────────────────────────────
+async function saveEntry() {
+  const amount = parseFloat(document.getElementById('fAmount').value);
+  const date   = document.getElementById('fDate').value.trim();
+  if (!selectedPerson)        { showToast('Выберите человека'); return; }
+  if (!amount || amount <= 0) { showToast('Введите корректную сумму'); return; }
+
+  const k = monthKey(currentDate);
+  setLoading(true);
+
+  if (editingId) {
+    const { error } = await sb.from('debt_data').update({ person: selectedPerson, amount, type: currentType, date }).eq('id', editingId).eq('user_id', USER_ID);
+    if (!error) {
+      const idx = _entries.findIndex(e => e.id === editingId);
+      if (idx !== -1) _entries[idx] = { ..._entries[idx], person: selectedPerson, amount, type: currentType, date };
+      showToast('Обновлено ✓');
+    }
+  } else {
+    const id = genId();
+    const { error } = await sb.from('debt_data').insert({ id, user_id: USER_ID, month_key: k, person: selectedPerson, amount, type: currentType, date });
+    if (!error) { _entries.push({ id, person: selectedPerson, amount, type: currentType, date }); showToast('Добавлено ✓'); }
+  }
+
+  setLoading(false);
+  closeSheet();
+  render();
+}
+
+async function deleteEntry(id) {
+  setLoading(true);
+  await sb.from('debt_data').delete().eq('id', id).eq('user_id', USER_ID);
+  _entries = _entries.filter(e => e.id !== id);
+  setLoading(false);
+  render();
+  showToast('Удалено');
+}
+
+function openEdit(id) {
+  const entry = _entries.find(e => e.id === id);
+  if (!entry) return;
+  editingId      = id;
+  selectedPerson = entry.person;
+  document.getElementById('sheetTitle').textContent = 'Редактировать';
+  document.getElementById('fAmount').value = entry.amount;
+  document.getElementById('fDate').value   = entry.date || '';
+  selectType(entry.type);
+  renderWhoChips(entry.person);
+  document.getElementById('overlay').classList.add('open');
+}
+
+// ── Sheet ─────────────────────────────────────────
+function openSheet() {
+  editingId = null; selectedPerson = null;
+  document.getElementById('sheetTitle').textContent = 'Новая запись';
+  document.getElementById('fAmount').value = '';
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2,'0');
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const yyyy = today.getFullYear();
+  document.getElementById('fDate').value = `${dd}.${mm}.${yyyy}`;
+  document.getElementById('newPersonRow').classList.remove('visible');
+  selectType('owe');
+  renderWhoChips(null);
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeSheet() {
+  document.getElementById('overlay').classList.remove('open');
+  editingId = null;
+}
+
+function overlayClick(e) {
+  if (e.target === document.getElementById('overlay')) closeSheet();
+}
+
+function selectType(t) {
+  currentType = t;
+  document.getElementById('typeOwe').className    = 'type-opt owe'    + (t==='owe'    ? ' active':'');
+  document.getElementById('typeCredit').className = 'type-opt credit' + (t==='credit' ? ' active':'');
+}
+
+// ── Toast ─────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+document.getElementById('fDate').addEventListener('input', function() {
+  let v = this.value.replace(/\D/g,'');
+  if (v.length > 2) v = v.slice(0,2) + '.' + v.slice(2);
+  if (v.length > 5) v = v.slice(0,5) + '.' + v.slice(5,9);
+  this.value = v;
+});
+
+document.getElementById('newPersonInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') confirmNewPerson();
+});
+
+if (window.Telegram?.WebApp) {
+  const tg = window.Telegram.WebApp;
+  tg.expand();
+  tg.setHeaderColor?.('#0d0d0f');
+  tg.setBackgroundColor?.('#0d0d0f');
+}
+
+loadMonth();
+</script>
+</body>
+</html>
