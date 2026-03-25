@@ -414,24 +414,10 @@ const SUPABASE_URL = 'https://zvfpigtuvwlernoftzve.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2ZnBpZ3R1dndsZXJub2Z0enZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTM2MDksImV4cCI6MjA4OTk2OTYwOX0.ZbBHdJQb_57f-qh_QS2aUF5ll8yjFxdjCc4BS7t0fXE';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// user_id: Telegram user id (телефон + Desktop) или localStorage
+// user_id: Telegram user id или случайный из localStorage
 const USER_ID = (() => {
-  const tg = window.Telegram?.WebApp;
-
-  // 1. initDataUnsafe — стандартный способ, работает на телефоне
-  const unsafeId = tg?.initDataUnsafe?.user?.id;
-  if (unsafeId) return String(unsafeId);
-
-  // 2. Telegram Desktop иногда не заполняет initDataUnsafe — парсим initData вручную
-  try {
-    const raw = tg?.initData;
-    if (raw) {
-      const user = JSON.parse(new URLSearchParams(raw).get('user') || '{}');
-      if (user?.id) return String(user.id);
-    }
-  } catch(_) {}
-
-  // 3. Fallback для браузера без Telegram
+  const tg = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+  if (tg) return String(tg);
   let id = localStorage.getItem('debt_uid');
   if (!id) { id = 'u_' + Math.random().toString(36).slice(2,10); localStorage.setItem('debt_uid', id); }
   return id;
@@ -845,6 +831,25 @@ if (window.Telegram?.WebApp) {
   tg.setHeaderColor?.('#0d0d0f');
   tg.setBackgroundColor?.('#0d0d0f');
 }
+
+// ── DEBUG — показывает что пришло от Telegram ──
+const _tg = window.Telegram?.WebApp;
+const _debugInfo = [
+  'USER_ID: ' + USER_ID,
+  'initData: ' + (_tg?.initData ? _tg.initData.slice(0,80)+'…' : 'ПУСТО'),
+  'unsafe.id: ' + (_tg?.initDataUnsafe?.user?.id ?? 'НЕТ'),
+  'version: ' + (_tg?.version ?? '?'),
+  'platform: ' + (_tg?.platform ?? '?'),
+].join('\n');
+
+const _dbg = document.createElement('div');
+_dbg.style.cssText = 'position:fixed;bottom:80px;left:10px;right:10px;z-index:9999;' +
+  'background:#1a1a1a;border:1px solid #444;color:#c8ff57;font-size:11px;' +
+  'font-family:monospace;padding:10px;border-radius:10px;white-space:pre-wrap;' +
+  'word-break:break-all;cursor:pointer;';
+_dbg.textContent = _debugInfo;
+_dbg.onclick = () => _dbg.remove();
+document.body.appendChild(_dbg);
 
 loadMonth();
 </script>
