@@ -414,53 +414,28 @@ const SUPABASE_URL = 'https://zvfpigtuvwlernoftzve.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2ZnBpZ3R1dndsZXJub2Z0enZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTM2MDksImV4cCI6MjA4OTk2OTYwOX0.ZbBHdJQb_57f-qh_QS2aUF5ll8yjFxdjCc4BS7t0fXE';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ── AUTH ──────────────────────────────────────────
-// USER_ID определяется асинхронно через Edge Function (валидация подписи Telegram)
-// Пока не получен — приложение показывает загрузку
-let USER_ID = null;
-
-const EDGE_FUNCTION_URL = 'https://zvfpigtuvwlernoftzve.supabase.co/functions/v1/tg-auth';
-
-async function resolveUserId() {
+// user_id: Telegram user id (телефон + Desktop) или localStorage
+const USER_ID = (() => {
   const tg = window.Telegram?.WebApp;
-  const initData = tg?.initData;
 
-  // 1. Есть initData — пробуем валидировать через Edge Function
-  if (initData) {
-    try {
-      const res = await fetch(EDGE_FUNCTION_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.userId) {
-          USER_ID = data.userId;
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn('Edge function error:', e);
+  // 1. initDataUnsafe — работает на большинстве клиентов
+  const unsafeId = tg?.initDataUnsafe?.user?.id;
+  if (unsafeId) return String(unsafeId);
+
+  // 2. Telegram Desktop иногда не заполняет initDataUnsafe — парсим initData вручную
+  try {
+    const raw = tg?.initData;
+    if (raw) {
+      const user = JSON.parse(new URLSearchParams(raw).get('user') || '{}');
+      if (user?.id) return String(user.id);
     }
-  }
+  } catch(_) {}
 
-  // 2. Edge Function недоступна или нет initData — берём из initDataUnsafe напрямую
-  const directId = tg?.initDataUnsafe?.user?.id;
-  if (directId) {
-    USER_ID = String(directId);
-    return;
-  }
-
-  // 3. Fallback — стабильный ID из localStorage (браузер / превью)
+  // 3. Fallback для браузера без Telegram
   let id = localStorage.getItem('debt_uid');
-  if (!id) {
-    id = 'u_' + Math.random().toString(36).slice(2, 10);
-    localStorage.setItem('debt_uid', id);
-  }
-  USER_ID = id;
-  console.warn('⚠ USER_ID from localStorage (anonymous):', USER_ID);
-}
+  if (!id) { id = 'u_' + Math.random().toString(36).slice(2,10); localStorage.setItem('debt_uid', id); }
+  return id;
+})();
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
                 'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -871,16 +846,7 @@ if (window.Telegram?.WebApp) {
   tg.setBackgroundColor?.('#0d0d0f');
 }
 
-// Инициализация: сначала получаем USER_ID, потом загружаем данные
-(async () => {
-  setLoading(true);
-  try {
-    await resolveUserId();
-    await loadMonth();
-  } finally {
-    setLoading(false);
-  }
-})();
+loadMonth();
 </script>
 </body>
 </html>
