@@ -425,7 +425,7 @@ async function resolveUserId() {
   const tg = window.Telegram?.WebApp;
   const initData = tg?.initData;
 
-  // Есть initData — валидируем через Edge Function
+  // 1. Есть initData — пробуем валидировать через Edge Function
   if (initData) {
     try {
       const res = await fetch(EDGE_FUNCTION_URL, {
@@ -445,27 +445,21 @@ async function resolveUserId() {
     }
   }
 
-  // Fallback для локальной отладки (не в Telegram)
-  // В продакшене этот блок никогда не выполнится при наличии initData
-  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-    let id = localStorage.getItem('debt_uid_dev');
-    if (!id) {
-      id = prompt('DEV MODE: введите Telegram User ID для отладки:') || 'dev_user';
-      localStorage.setItem('debt_uid_dev', id);
-    }
-    USER_ID = id;
+  // 2. Edge Function недоступна или нет initData — берём из initDataUnsafe напрямую
+  const directId = tg?.initDataUnsafe?.user?.id;
+  if (directId) {
+    USER_ID = String(directId);
     return;
   }
 
-  // Если открыто не в Telegram и не localhost — показываем ошибку
-  document.body.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-                height:100vh;color:#f0f0f5;font-family:sans-serif;text-align:center;padding:24px">
-      <div style="font-size:48px;margin-bottom:16px">🔒</div>
-      <div style="font-size:18px;font-weight:700;margin-bottom:10px">Только для Telegram</div>
-      <div style="color:#6e6e82;font-size:14px">Откройте приложение через Telegram Mini App</div>
-    </div>`;
-  throw new Error('Not in Telegram');
+  // 3. Fallback — стабильный ID из localStorage (браузер / превью)
+  let id = localStorage.getItem('debt_uid');
+  if (!id) {
+    id = 'u_' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('debt_uid', id);
+  }
+  USER_ID = id;
+  console.warn('⚠ USER_ID from localStorage (anonymous):', USER_ID);
 }
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
