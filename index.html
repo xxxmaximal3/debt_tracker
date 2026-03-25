@@ -414,15 +414,15 @@ const SUPABASE_URL = 'https://zvfpigtuvwlernoftzve.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2ZnBpZ3R1dndsZXJub2Z0enZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTM2MDksImV4cCI6MjA4OTk2OTYwOX0.ZbBHdJQb_57f-qh_QS2aUF5ll8yjFxdjCc4BS7t0fXE';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// user_id: Telegram user id (телефон + Desktop) или localStorage
+// user_id: только через Telegram
 const USER_ID = (() => {
   const tg = window.Telegram?.WebApp;
 
-  // 1. initDataUnsafe — стандартный способ, работает на телефоне
+  // 1. initDataUnsafe
   const unsafeId = tg?.initDataUnsafe?.user?.id;
   if (unsafeId) return String(unsafeId);
 
-  // 2. Telegram Desktop иногда не заполняет initDataUnsafe — парсим initData вручную
+  // 2. Парсим initData вручную (Telegram Desktop)
   try {
     const raw = tg?.initData;
     if (raw) {
@@ -431,10 +431,20 @@ const USER_ID = (() => {
     }
   } catch(_) {}
 
-  // 3. Fallback для браузера без Telegram
-  let id = localStorage.getItem('debt_uid');
-  if (!id) { id = 'u_' + Math.random().toString(36).slice(2,10); localStorage.setItem('debt_uid', id); }
-  return id;
+  // Не Telegram — показываем заглушку
+  document.body.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                height:100vh;background:#0d0d0f;color:#f0f0f5;font-family:sans-serif;
+                text-align:center;padding:32px;">
+      <div style="font-size:64px;margin-bottom:24px">🔒</div>
+      <div style="font-family:'Unbounded',sans-serif;font-size:20px;font-weight:700;
+                  margin-bottom:12px;color:#c8ff57;">Только для Telegram</div>
+      <div style="color:#6e6e82;font-size:14px;line-height:1.7;max-width:280px;">
+        Это приложение работает только внутри Telegram.<br><br>
+        Откройте его через кнопку меню вашего бота.
+      </div>
+    </div>`;
+  throw new Error('Not in Telegram');
 })();
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
