@@ -418,7 +418,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const USER_ID = (() => {
   const tg = window.Telegram?.WebApp;
 
-  // 1. initDataUnsafe — работает на большинстве клиентов
+  // 1. initDataUnsafe — стандартный способ, работает на телефоне
   const unsafeId = tg?.initDataUnsafe?.user?.id;
   if (unsafeId) return String(unsafeId);
 
