@@ -414,14 +414,59 @@ const SUPABASE_URL = 'https://zvfpigtuvwlernoftzve.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2ZnBpZ3R1dndsZXJub2Z0enZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTM2MDksImV4cCI6MjA4OTk2OTYwOX0.ZbBHdJQb_57f-qh_QS2aUF5ll8yjFxdjCc4BS7t0fXE';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// user_id: Telegram user id или случайный из localStorage
-const USER_ID = (() => {
-  const tg = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
-  if (tg) return String(tg);
-  let id = localStorage.getItem('debt_uid');
-  if (!id) { id = 'u_' + Math.random().toString(36).slice(2,10); localStorage.setItem('debt_uid', id); }
-  return id;
-})();
+// ── AUTH ──────────────────────────────────────────
+// USER_ID определяется асинхронно через Edge Function (валидация подписи Telegram)
+// Пока не получен — приложение показывает загрузку
+let USER_ID = null;
+
+const EDGE_FUNCTION_URL = 'https://zvfpigtuvwlernoftzve.supabase.co/functions/v1/tg-auth';
+
+async function resolveUserId() {
+  const tg = window.Telegram?.WebApp;
+  const initData = tg?.initData;
+
+  // Есть initData — валидируем через Edge Function
+  if (initData) {
+    try {
+      const res = await fetch(EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.userId) {
+          USER_ID = data.userId;
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Edge function error:', e);
+    }
+  }
+
+  // Fallback для локальной отладки (не в Telegram)
+  // В продакшене этот блок никогда не выполнится при наличии initData
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    let id = localStorage.getItem('debt_uid_dev');
+    if (!id) {
+      id = prompt('DEV MODE: введите Telegram User ID для отладки:') || 'dev_user';
+      localStorage.setItem('debt_uid_dev', id);
+    }
+    USER_ID = id;
+    return;
+  }
+
+  // Если открыто не в Telegram и не localhost — показываем ошибку
+  document.body.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                height:100vh;color:#f0f0f5;font-family:sans-serif;text-align:center;padding:24px">
+      <div style="font-size:48px;margin-bottom:16px">🔒</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:10px">Только для Telegram</div>
+      <div style="color:#6e6e82;font-size:14px">Откройте приложение через Telegram Mini App</div>
+    </div>`;
+  throw new Error('Not in Telegram');
+}
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
                 'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -832,7 +877,16 @@ if (window.Telegram?.WebApp) {
   tg.setBackgroundColor?.('#0d0d0f');
 }
 
-loadMonth();
+// Инициализация: сначала получаем USER_ID, потом загружаем данные
+(async () => {
+  setLoading(true);
+  try {
+    await resolveUserId();
+    await loadMonth();
+  } finally {
+    setLoading(false);
+  }
+})();
 </script>
 </body>
 </html>
