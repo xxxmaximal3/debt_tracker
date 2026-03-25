@@ -123,6 +123,11 @@ td.r { text-align: right; }
 .badge.credit { background: var(--green-dim); color: var(--green); }
 
 .td-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.mobile-actions { display: none; margin-top: 5px; justify-content: flex-start; }
+@media (max-width: 600px) {
+  .mobile-actions  { display: flex; }
+  .desktop-actions { display: none; }
+}
 .icon-btn {
   width: 28px; height: 28px; background: var(--surface2);
   border: 1px solid var(--border); border-radius: 8px;
@@ -619,7 +624,7 @@ function render() {
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
-  if (!has) { updateSortHeaders(); return; }
+  if (!has) { updateSortHeaders(); renderDebtorSummary([]); return; }
 
   const sorted = [..._entries].sort((a, b) => {
     let va, vb;
@@ -639,11 +644,17 @@ function render() {
     const tr = document.createElement('tr');
     tr.style.cssText = `background:${c.bg}; border-left:3px solid ${c.border};`;
     tr.innerHTML = `
-      <td><div class="td-name" style="color:${c.text}">${esc(e.person)}</div></td>
+      <td>
+        <div class="td-name" style="color:${c.text}">${esc(e.person)}</div>
+        <div class="td-actions mobile-actions">
+          <button class="icon-btn edit" onclick="openEdit('${e.id}')">✎</button>
+          <button class="icon-btn del"  onclick="deleteEntry('${e.id}')">✕</button>
+        </div>
+      </td>
       <td class="r td-date">${esc(e.date || '—')}</td>
       <td class="r td-amt ${e.type==='owe'?'neg':'pos'}">${fmt(e.amount)}</td>
       <td class="r"><span class="badge ${e.type}">${e.type==='owe'?'Должен':'Мне'}</span></td>
-      <td class="r">
+      <td class="r desktop-actions">
         <div class="td-actions">
           <button class="icon-btn edit" onclick="openEdit('${e.id}')">✎</button>
           <button class="icon-btn del"  onclick="deleteEntry('${e.id}')">✕</button>
