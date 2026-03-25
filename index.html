@@ -89,37 +89,58 @@ body { background: var(--bg); color: var(--text); font-family: 'Onest', sans-ser
   text-transform: uppercase; color: var(--muted); margin: 14px 0 8px;
 }
 
-/* ── TABLE ── */
+/* ── LIST ── */
 .table-wrap { border-radius: var(--r); overflow: hidden; border: 1px solid var(--border); }
-table { table-layout: fixed; }
-table { width: 100%; border-collapse: collapse; }
 
-thead th {
-  background: var(--surface2); padding: 9px 10px;
+/* Заголовок */
+.list-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  background: var(--surface2);
+  padding: 9px 12px;
+  gap: 8px;
+}
+.list-head-cell {
   font-size: 11px; font-weight: 600; color: var(--muted);
-  letter-spacing: .5px; text-transform: uppercase; text-align: left;
+  letter-spacing: .5px; text-transform: uppercase;
   cursor: pointer; user-select: none; white-space: nowrap;
-  transition: color .12s;
+  transition: color .12s; display: flex; align-items: center;
 }
-thead th:hover { color: var(--text); }
-thead th.r { text-align: right; }
-thead th .sort-arrow { margin-left: 4px; opacity: 0.35; font-style: normal; }
-thead th.sort-active { color: var(--accent); }
-thead th.sort-active .sort-arrow { opacity: 1; }
+.list-head-cell.r { justify-content: flex-end; }
+.list-head-cell:hover { color: var(--text); }
+.list-head-cell .sort-arrow { margin-left: 4px; opacity: 0.35; font-style: normal; }
+.list-head-cell.sort-active { color: var(--accent); }
+.list-head-cell.sort-active .sort-arrow { opacity: 1; }
 
-tbody tr { border-top: 1px solid var(--border); background: var(--surface); transition: background .12s; }
-tbody tr:first-child { border-top: none; }
-tbody tr td:first-child { position: relative; }
-tbody tr td:first-child::before {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-  width: 3px; background: var(--row-color, transparent);
+/* Строка записи */
+.list-row {
+  border-top: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  transition: background .12s;
 }
+.list-row:first-child { border-top: none; }
 
-td { padding: 11px 10px; font-size: 13px; vertical-align: middle; }
-td.r { text-align: right; }
+.list-cell { font-size: 13px; }
+.list-cell.r { text-align: right; display: flex; justify-content: flex-end; align-items: center; }
 
 .td-name { font-weight: 500; }
 .td-amt  { font-family: 'Unbounded', sans-serif; font-size: 12px; }
+/* Мобиле: имя + кнопки в одной ячейке, скрываем колонку действий */
+.name-cell { display: flex; flex-direction: column; gap: 6px; }
+.mobile-actions { display: none; gap: 6px; }
+@media (max-width: 600px) {
+  .mobile-actions  { display: flex; }
+  .desktop-actions { display: none; }
+  .list-head { grid-template-columns: 1fr auto auto; }
+  .list-row  { grid-template-columns: 1fr auto auto; }
+  .list-head-cell.hide-mobile { display: none; }
+  .list-cell.hide-mobile { display: none; }
+}
 
 .badge {
   display: inline-block; padding: 2px 8px; border-radius: 6px;
@@ -129,11 +150,6 @@ td.r { text-align: right; }
 .badge.credit { background: var(--green-dim); color: var(--green); }
 
 .td-actions { display: flex; gap: 6px; justify-content: flex-end; }
-.mobile-actions { display: none; margin-top: 5px; justify-content: flex-start; padding-left: 4px; }
-@media (max-width: 600px) {
-  .mobile-actions  { display: flex; }
-  .desktop-actions { display: none; }
-}
 .icon-btn {
   width: 28px; height: 28px; background: var(--surface2);
   border: 1px solid var(--border); border-radius: 8px;
@@ -285,8 +301,6 @@ td.r { text-align: right; }
 .debtor-amt.neg { color: var(--red);   background: var(--red-dim);   }
 .debtor-amt.net { color: var(--accent); background: var(--accent-dim); }
 
-.td-date { font-size: 11px; color: var(--muted); white-space: nowrap; }
-
 .loading-overlay {
   position: fixed; inset: 0; z-index: 100;
   background: rgba(13,13,15,0.7); backdrop-filter: blur(4px);
@@ -340,18 +354,13 @@ td.r { text-align: right; }
   <div class="section-title">Записи</div>
 
   <div class="table-wrap" id="tableWrap">
-    <table>
-      <thead>
-        <tr>
-          <th onclick="sortBy('person')">Кто должен<i class="sort-arrow" id="arr-person">↕</i></th>
-          <th class="r" onclick="sortBy('date')">Дата<i class="sort-arrow" id="arr-date">↕</i></th>
-          <th class="r" onclick="sortBy('amount')">Сумма<i class="sort-arrow" id="arr-amount">↕</i></th>
-          <th class="r" onclick="sortBy('type')">Тип<i class="sort-arrow" id="arr-type">↕</i></th>
-          <th class="r"></th>
-        </tr>
-      </thead>
-      <tbody id="tableBody"></tbody>
-    </table>
+    <div class="list-head">
+      <div class="list-head-cell" onclick="sortBy('person')">Кто должен<i class="sort-arrow" id="arr-person">↕</i></div>
+      <div class="list-head-cell r hide-mobile" onclick="sortBy('date')">Дата<i class="sort-arrow" id="arr-date">↕</i></div>
+      <div class="list-head-cell r" onclick="sortBy('amount')">Сумма<i class="sort-arrow" id="arr-amount">↕</i></div>
+      <div class="list-head-cell r" onclick="sortBy('type')">Тип<i class="sort-arrow" id="arr-type">↕</i></div>
+    </div>
+    <div id="tableBody"></div>
   </div>
 
   <div id="emptyState" class="empty">
@@ -597,10 +606,10 @@ function sortBy(col) {
 
 function updateSortHeaders() {
   ['person','date','amount','type'].forEach(col => {
-    const th  = document.getElementById('arr-' + col)?.parentElement;
-    const arr = document.getElementById('arr-' + col);
-    if (!th || !arr) return;
-    th.classList.toggle('sort-active', sortCol === col);
+    const cell = document.getElementById('arr-' + col)?.parentElement;
+    const arr  = document.getElementById('arr-' + col);
+    if (!cell || !arr) return;
+    cell.classList.toggle('sort-active', sortCol === col);
     arr.textContent = sortCol === col ? (sortAsc ? '↑' : '↓') : '↕';
   });
 }
@@ -640,27 +649,27 @@ function render() {
   updateSortHeaders();
 
   sorted.forEach(e => {
-    const c  = getPersonColor(e.person);
-    const tr = document.createElement('tr');
-    tr.style.cssText = `background:${c.bg}; --row-color:${c.border};`;
-    tr.innerHTML = `
-      <td>
+    const c   = getPersonColor(e.person);
+    const row = document.createElement('div');
+    row.className = 'list-row';
+    row.style.cssText = `background:${c.bg}; border-left-color:${c.border};`;
+    row.innerHTML = `
+      <div class="list-cell name-cell">
         <div class="td-name" style="color:${c.text}">${esc(e.person)}</div>
-        <div class="td-actions mobile-actions">
+        <div class="td-date hide-mobile-text" style="display:none">${esc(e.date || '—')}</div>
+        <div class="mobile-actions">
           <button class="icon-btn edit" onclick="openEdit('${e.id}')">✎</button>
           <button class="icon-btn del"  onclick="deleteEntry('${e.id}')">✕</button>
         </div>
-      </td>
-      <td class="r td-date">${esc(e.date || '—')}</td>
-      <td class="r td-amt ${e.type==='owe'?'neg':'pos'}">${fmt(e.amount)}</td>
-      <td class="r"><span class="badge ${e.type}">${e.type==='owe'?'Должен':'Мне'}</span></td>
-      <td class="r desktop-actions">
-        <div class="td-actions">
-          <button class="icon-btn edit" onclick="openEdit('${e.id}')">✎</button>
-          <button class="icon-btn del"  onclick="deleteEntry('${e.id}')">✕</button>
-        </div>
-      </td>`;
-    tbody.appendChild(tr);
+      </div>
+      <div class="list-cell r hide-mobile td-date">${esc(e.date || '—')}</div>
+      <div class="list-cell r td-amt ${e.type==='owe'?'neg':'pos'}">${fmt(e.amount)}</div>
+      <div class="list-cell r desktop-actions" style="gap:6px;display:flex;justify-content:flex-end;align-items:center;">
+        <span class="badge ${e.type}">${e.type==='owe'?'Должен':'Мне'}</span>
+        <button class="icon-btn edit" onclick="openEdit('${e.id}')">✎</button>
+        <button class="icon-btn del"  onclick="deleteEntry('${e.id}')">✕</button>
+      </div>`;
+    tbody.appendChild(row);
   });
 
   let credit = 0, owe = 0;
