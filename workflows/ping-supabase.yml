@@ -1,0 +1,23 @@
+name: Keep Supabase alive
+
+on:
+  schedule:
+    - cron: '0 9 * * 1,4'  # каждый понедельник и четверг в 9:00 UTC
+  workflow_dispatch:        # можно запустить вручную
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/debt_people?select=name&limit=1")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "Ping failed!"
+            exit 1
+          fi
+          echo "Supabase is alive ✓"
